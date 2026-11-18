@@ -8,48 +8,48 @@ for h = 2..24. Python 3.13, standard library only, no network, deterministic.
 Method (all in log space, because the score is pinball loss on log viewers):
 
 1. Anchor. The median forecast for every hour is anchored on the case's
-hour-1 print p1 (the mean Twitch viewers of the release day's first
-hour). If the case somehow has no usable hour-1 print, fall back to the
-last positive pre-checkpoint hourly point, else to 1 viewer.
+   hour-1 print p1 (the mean Twitch viewers of the release day's first
+   hour). If the case somehow has no usable hour-1 print, fall back to the
+   last positive pre-checkpoint hourly point, else to 1 viewer.
 
 2. Intraday shape from the case's own comparables. Each comparable is a
-past big launch with hourly Twitch counts from 14 days before its
-release day to 3 days after. For every comparable we take its release
-day (its `day_start`, 00:00 UTC), read its hour-1 viewers v1 and the
-viewers v_h of each later hour, and record log(v_h / v1). The median of
-those log-ratios across comparables is the shape m_h: how a launch day
-typically moves after its first hour (early-hours dip while most of the
-world is still asleep, then a climb into the US/EU evening peak around
-hours 19-21, then a slow fade). The median is used instead of the mean
-so one freak launch cannot drag the curve.
+   past big launch with hourly Twitch counts from 14 days before its
+   release day to 3 days after. For every comparable we take its release
+   day (its `day_start`, 00:00 UTC), read its hour-1 viewers v1 and the
+   viewers v_h of each later hour, and record log(v_h / v1). The median of
+   those log-ratios across comparables is the shape m_h: how a launch day
+   typically moves after its first hour (early-hours dip while most of the
+   world is still asleep, then a climb into the US/EU evening peak around
+   hours 19-21, then a slow fade). The median is used instead of the mean
+   so one freak launch cannot drag the curve.
 
-Two filters keep the pool honest for a console game that unlocks at
-midnight local time, rolling country by country (which is how GTA VI
-unlocks):
-- the target category's own pre-release history (unlock text starting
-with "Not a launch") is not a launch at all and is dropped;
-- launches whose notes flag early access, a free-to-play launch or a
-weak tier are dropped, because their day-one curves are driven by
-early-access or live-service dynamics, not by a midnight unlock.
-The median log-ratio itself is clamped to [-1.5, +2.0] (a 0.22x to 7.4x
-move on hour 1): a guard against a pathological donor pool, for
-example when a donor's hour-1 print is near zero because its category
-was almost empty at midnight, which would otherwise let one wild
-ratio drag the median.
+   Two filters keep the pool honest for a console game that unlocks at
+   midnight local time, rolling country by country (which is how GTA VI
+   unlocks):
+   - the target category's own pre-release history (unlock text starting
+     with "Not a launch") is not a launch at all and is dropped;
+   - launches whose notes flag early access, a free-to-play launch or a
+     weak tier are dropped, because their day-one curves are driven by
+     early-access or live-service dynamics, not by a midnight unlock.
+   The median log-ratio itself is clamped to [-1.5, +2.0] (a 0.22x to 7.4x
+   move on hour 1): a guard against a pathological donor pool, for
+   example when a donor's hour-1 print is near zero because its category
+   was almost empty at midnight, which would otherwise let one wild
+   ratio drag the median.
 
 3. Spread from cross-launch disagreement. For each hour the spread s_h
-is 0.55 times the population standard deviation of the comparables'
-log-ratios that hour, clipped to [0.25, 0.90]. Hours where launches
-disagree a lot get a wide band; hours where they agree get a narrow
-one. The spread grows naturally with horizon because launches diverge
-more later in the day. Where too few comparables report an hour, the
-fallback is 0.30 + 0.08 * sqrt(h - 1).
+   is 0.55 times the population standard deviation of the comparables'
+   log-ratios that hour, clipped to [0.25, 0.90]. Hours where launches
+   disagree a lot get a wide band; hours where they agree get a narrow
+   one. The spread grows naturally with horizon because launches diverge
+   more later in the day. Where too few comparables report an hour, the
+   fallback is 0.30 + 0.08 * sqrt(h - 1).
 
 4. Quantiles. q_tau(h) = p1 * exp(m_h + z_tau * s_h), where z_tau is the
-standard normal quantile at the case's levels (Acklam's approximation
-below), rounded half-up to 2 decimals, clamped to (0, 1e9] and forced
-non-decreasing within the row. The median (tau = 0.5) is exactly
-p1 * exp(m_h): the shape curve itself.
+   standard normal quantile at the case's levels (Acklam's approximation
+   below), rounded half-up to 2 decimals, clamped to (0, 1e9] and forced
+   non-decreasing within the row. The median (tau = 0.5) is exactly
+   p1 * exp(m_h): the shape curve itself.
 
 Why this beats the house baseline (flat median p1, spread 0.15*sqrt(h-1)):
 the baseline assumes the day stays flat, but real launch days do not:
